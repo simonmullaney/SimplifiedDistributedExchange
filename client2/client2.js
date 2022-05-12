@@ -16,11 +16,21 @@ const peer = new PeerRPCClient(link, {})
 peer.init()
 
 
-const payload = {id:"client2", trade: "Buy", pair: "tBTCUSD", amount: 1.0860}
+const payload = {id:"client2", trade: "Sell", pair: "tBTCUSD", amount: 1.0860}
 
 
 peer.request('orderbook_worker', payload, { timeout: 100000 }, (err, result) => {
   if (err) throw err
   console.log('Adding order:',payload, 'to orderbook.')
-  console.log('Resulting orderbook: ',result);
+  console.log('Returned orderbooks:');
+  console.log('\nclientOrderbookResult: ');
+  for (var key in result.clientOrderbookResult) {
+    console.log("\Client specific order book:",key,":");
+    console.table(result.clientOrderbookResult[key]);
+  }
+  console.log('\nsharedOrderbookResult: ');
+  for (var keys in result.sharedOrderbookResult) {
+    console.log("\nShared order book:",keys,":");
+    console.table(result.sharedOrderbookResult[keys]);
+  }
 })

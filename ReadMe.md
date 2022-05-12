@@ -11,14 +11,6 @@ Requirement:
 * Simple order matching engine
 * You don't need to create a UI or HTTP API
 
-You should not spend more time than 6-8 hours on the task. We know that its probably not possible to complete the task 100% in the given time.
-
-
-If you don't get to the end, just write up what is missing for a complete implementation of the task. Also, if your implementation has limitation and issues, that's no big deal. Just write everything down and indicate how you could solve them, given there was more time.
-
-Good luck!
-
-
 
 ## Running simplified distributed exchange
 
@@ -44,7 +36,12 @@ npm install --save grenache-nodejs-link
 ```
 
 
-### Clone the repository
+### Clone this repository
+
+
+```
+git clone https://github.com/simonmullaney/SimplifiedDistributedExchange.git
+```
 
 ## Running simplified distributed exchange
 
@@ -86,4 +83,11 @@ npm i
 node client.js
 ```
 
-As each client is started they will automatically send preconfigured trades to the RPC server
+As each client is started they will automatically send preconfigured trades to the RPC server.
+
+You can change the payload of the respective clients to send different messages to the RPC server:
+
+```
+const payload = {id:"client1",trade: "Buy", pair: "tBTCUSD", amount: 1.0860}
+
+```

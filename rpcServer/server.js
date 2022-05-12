@@ -18,6 +18,7 @@ let independantClientOrderbook = {};
 
 let sharedPairTotals = {};
 let clientPairTotals = {};
+let isLocked = false;
 
 
 link.start()
@@ -32,14 +33,23 @@ const service = peer.transport('server')
 service.listen(port)
 
 setInterval(function () {
-  link.announce('rpc_test', service.port, {});
   link.announce('orderbook_worker', service.port, {})
 }, 1000)
 
 service.on('request', async(rid, key, payload, handler) => {
 
   const clientOrderbookResult = await addToClientOrderBook(payload);
-  const sharedOrderbookResult = await addToSharedOrderBook(payload);
+  console.log("Returned clientOrderbookResult:",clientOrderbookResult);
+  let sharedOrderbookResult;
+
+  //Only add to shared order book if it is not currently being updated
+  if(!isLocked){
+    sharedOrderbookResult = await addToSharedOrderBook(payload);
+    console.log("sharedOrderbookResult:",sharedOrderbookResult);
+    isLocked = false;
+  }else{
+    console.log("Shared orderbook is being updated currently, please retry...");
+  }
 
   let result = {clientOrderbookResult: clientOrderbookResult, sharedOrderbookResult: sharedOrderbookResult}
 
@@ -56,7 +66,8 @@ sharedOrderbook:
   - values of format: {id: 'client1',trade: 'Sell',pair: 'tBTCUSD',amount: 1.086,total: 1.086,price: 28658}
 */
 async function addToSharedOrderBook(order){
-
+  //set isLocked to true, to prevent a race condition hwne two clients try to add to add To Shared Order Book at the same time
+  isLocked = true;
   console.log("Adding order: ",order," to shared order book");
 
   //Shared orderbook key of format: 'tBTCUSD-Buy'
@@ -77,6 +88,8 @@ async function addToSharedOrderBook(order){
     //check if order already exists
     if (checkIfClientOrderExists(order,sharedOrderOperation)) {
       console.log("Order already exist and existing order has been increased");
+      sharedPairTotals[sharedOrderOperation] = order.amount + sharedPairTotals[sharedOrderOperation];
+      order.total = sharedPairTotals[sharedOrderOperation];
 
     }else {
       console.log("Order does not already exist...");
@@ -87,7 +100,6 @@ async function addToSharedOrderBook(order){
       sharedOrderbook[sharedOrderOperation].push(order);
     }
   }
-
   console.log("sharedOrderbook: ",sharedOrderbook);
   return sharedOrderbook;
 }
@@ -126,7 +138,7 @@ async function addToClientOrderBook (order) {
 
   console.log("independantClientOrderbook: ",independantClientOrderbook);
 
-  return independantClientOrderbook[orderOperation];
+  return independantClientOrderbook;
 
 }
 
@@ -149,7 +161,7 @@ function retriveTradingPairPrice(tradingPair){
       })
 }
 
-//If a client's order matches with another order, any remainer is added to the orderbook, too.
+//If a client's order matches with another order, increment existing order by new order
 function checkIfClientOrderExists(order,sharedOrderOperation){
 
   console.log("Checking if an existing client order already exists");
@@ -161,10 +173,10 @@ function checkIfClientOrderExists(order,sharedOrderOperation){
     console.log("sharedOrderbook[operation][i]: ",sharedOrderbook[sharedOrderOperation][i]);
     if(order.trade === sharedOrderbook[sharedOrderOperation][i].trade && order.pair === sharedOrderbook[sharedOrderOperation][i].pair && order.price === sharedOrderbook[sharedOrderOperation][i].price){
       console.log("Found existing trade: ",sharedOrderbook[sharedOrderOperation][i]);
-      //assuming that if trade already exists, we increment the amount of that existing trade by the amount of the new matching trade
+      //assuming that if trade already exists, we increment the amount of that existing trade by the amount of the new matching trade and increase the total
       sharedOrderbook[sharedOrderOperation][i].amount = sharedOrderbook[sharedOrderOperation][i].amount + order.amount;
+      sharedOrderbook[sharedOrderOperation][i].total = sharedOrderbook[sharedOrderOperation][i].total + order.amount;
       return true;
     }
-      else false;
   }
 }

@@ -9,6 +9,7 @@
   "author": "Simon Mullaney",
   "license": "ISC",
   "dependencies": {
+    "axios": "^0.27.2",
     "grenache-nodejs-http": "^0.7.12",
     "grenache-nodejs-link": "^0.7.12"
   }

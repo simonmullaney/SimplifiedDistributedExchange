@@ -7,14 +7,17 @@
 
 const { PeerRPCServer }  = require('grenache-nodejs-http')
 const Link = require('grenache-nodejs-link')
+const axios = require('axios')
+
 
 
 const link = new Link({
   grape: 'http://127.0.0.1:30001'
 })
 
-const orderbook = [];
-const independantClientOrderbook = {};
+let orderbook = [];
+let independantClientOrderbook = {};
+let pairTotals = {};
 
 
 link.start()
@@ -44,27 +47,48 @@ service.on('request', (rid, key, payload, handler) => {
 })
 
 
-function addToOrderBook (order) {
+async function addToOrderBook (order) {
 
   console.log("Adding order: ", order, " to orderbook");
 
   /*
     Orderbook:
       Pair: order.pair
-          id: order.id, Amount:order.amount, Total: calculateTotal(), Price: retriveTradingPairPrice()
+        Trade: order.trade
+          id: order.id, Amount:order.amount, Total: calculatePairTotal(), Price: retriveTradingPairPrice()
 
 
     independantClientOrderbook:
       Client: order.id
         Pair: order.pair
-            id: order.id, Amount:order.amount, Total: calculateTotal(), Price: retriveTradingPairPrice()
+          Trade: order.trade
+            id: order.id, Amount:order.amount, Total: calculateTotal(), Price: c
   */
 
-  orderbook.push(order)
-  if (!independantClientOrderbook[order.id]) {
-    independantClientOrderbook[order.id] = [order]
+  console.log("Settign independantClientOrderbook");
+
+  //order operation of format: 'client1-tBTCUSD-Buy'
+  let orderOperation = order.id+'-'+order.pair+'-'+order.trade;
+  console.log("orderOperation: ",orderOperation);
+
+  // independantClientOrderbook[orderOperation] = order;
+
+  // orderbook.push(order)
+  if(!independantClientOrderbook[orderOperation]) {
+    order.total = order.amount;
+    pairTotals[orderOperation] = order.amount;
+    order.price = await retriveTradingPairPrice(order.pair)
+    console.log("Returned order price: ",order.price);
+
+    independantClientOrderbook[orderOperation] = [order]
   }else{
-    independantClientOrderbook[order.id].push(order)
+    pairTotals[orderOperation] = order.amount + pairTotals[orderOperation];
+    order.total = pairTotals[orderOperation];
+    order.price = await retriveTradingPairPrice(order.pair)
+
+    console.log("Returned order price: ",order.price);
+
+    independantClientOrderbook[orderOperation].push(order)
   }
 
   console.log("independantClientOrderbook: ",independantClientOrderbook);
@@ -72,3 +96,38 @@ function addToOrderBook (order) {
   return {orderbook:orderbook, independantClientOrderbook: independantClientOrderbook[order.id]}
 
 }
+
+
+//function to retrive trading pair price given a paticular trading pair
+function retriveTradingPairPrice(tradingPair){
+
+  console.log("Retrievig trading pair price from Bitfinex for trading pair: ", tradingPair);
+
+  const baseUrl = "https://api-pub.bitfinex.com/v2/";
+  const pathParams = "tickers"
+  const queryParams = "symbols="+tradingPair
+
+  return axios.get(`${baseUrl}/${pathParams}?${queryParams}`)
+      .then(response => {
+          console.log(response.data[0]);
+          console.log(response.data[0][7]);
+          return response.data[0][7]
+      }, error => {
+          console.log(error);
+      })
+}
+
+
+
+
+
+//function to calculate specific trading pair total
+// function calculatePairTotal(order){
+//   console.log("Calculating Pair Total for order: ", order);
+//   if (order.trade == "Sell") {
+//     console.log("Sell order trade, reducing pair total");
+//     console.log("Pair: ", order.pair);
+//
+//   } else if(order.trade == "Buy"){}
+//
+// }

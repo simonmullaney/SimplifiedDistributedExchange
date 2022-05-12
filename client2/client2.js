@@ -16,7 +16,7 @@ const peer = new PeerRPCClient(link, {})
 peer.init()
 
 
-const payload = {id:"client2", trade: "Sell", pair: "tBTCUSD", amount: 1.0860}
+const payload = {id:"client2", trade: "Buy", pair: "tBTCUSD", amount: 1.0860}
 
 
 peer.request('orderbook_worker', payload, { timeout: 100000 }, (err, result) => {

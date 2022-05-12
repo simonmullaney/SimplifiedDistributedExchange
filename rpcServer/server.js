@@ -37,10 +37,6 @@ setInterval(function () {
 }, 1000)
 
 service.on('request', async(rid, key, payload, handler) => {
-  // console.log("rid: ",rid);
-  // console.log("key: ",key);
-  // console.log("payload: ",payload);
-  // console.log("handler: ",handler);
 
   const clientOrderbookResult = await addToClientOrderBook(payload);
   const sharedOrderbookResult = await addToSharedOrderBook(payload);
@@ -48,23 +44,22 @@ service.on('request', async(rid, key, payload, handler) => {
   let result = {clientOrderbookResult: clientOrderbookResult, sharedOrderbookResult: sharedOrderbookResult}
 
   // console.log("Returning result: ",result);
-
   handler.reply(null, result);
 })
 
-// Function to add order to shared orderbook amongst all clients
-//Todo: * If a client's order matches with another order, any remainer is added to the orderbook, too.
+/*
+Function to add order to shared orderbook amongst all clients
+template for orderbook taken from https://www.bitfinex.com/order-book/
+
+sharedOrderbook:
+  - keys of format: pair-trade i.e. tBTCUSD-Sell
+  - values of format: {id: 'client1',trade: 'Sell',pair: 'tBTCUSD',amount: 1.086,total: 1.086,price: 28658}
+*/
 async function addToSharedOrderBook(order){
 
-  /*
-    Orderbook:
-      Pair: order.pair
-        Trade: order.trade
-          id: order.id, Amount:order.amount, Total: calculatePairTotal(), Price: retriveTradingPairPrice()
-  */
-  console.log("Adding order to shared order book");
+  console.log("Adding order: ",order," to shared order book");
 
-  //Shared orderbook operation of format: 'tBTCUSD-Buy'
+  //Shared orderbook key of format: 'tBTCUSD-Buy'
   let sharedOrderOperation = order.pair+"-"+order.trade;
 
   console.log("sharedOrderOperation: ",sharedOrderOperation);
@@ -78,31 +73,37 @@ async function addToSharedOrderBook(order){
     sharedOrderbook[sharedOrderOperation] = [order];
   }else{
     console.log("Multiple");
-    sharedPairTotals[sharedOrderOperation] = order.amount + sharedPairTotals[sharedOrderOperation];
-    order.total = sharedPairTotals[sharedOrderOperation];
-    order.price = await retriveTradingPairPrice(order.pair);
-    console.log("Returned order price: ",order.price);
-    sharedOrderbook[sharedOrderOperation].push(order);
+
+    //check if order already exists
+    if (checkIfClientOrderExists(order,sharedOrderOperation)) {
+      console.log("Order already exist and existing order has been increased");
+
+    }else {
+      console.log("Order does not already exist...");
+      sharedPairTotals[sharedOrderOperation] = order.amount + sharedPairTotals[sharedOrderOperation];
+      order.total = sharedPairTotals[sharedOrderOperation];
+      order.price = await retriveTradingPairPrice(order.pair);
+      console.log("Returned order price: ",order.price);
+      sharedOrderbook[sharedOrderOperation].push(order);
+    }
   }
 
   console.log("sharedOrderbook: ",sharedOrderbook);
-
   return sharedOrderbook;
 }
 
-// Function to add order to independant client orderbook
+
+/*
+Function to add order to independant client orderbook
+template for orderbook taken from https://www.bitfinex.com/order-book/
+
+independantClientOrderbook:
+  - keys of format: id-pair-trade i.e. client1-tBTCUSD-Sell
+  - values of format: {id: 'client1',trade: 'Sell',pair: 'tBTCUSD',amount: 1.086,total: 1.086,price: 28658}
+*/
 async function addToClientOrderBook (order) {
 
   console.log("Adding order: ", order, " to orderbook");
-
-  /*
-    independantClientOrderbook:
-      Client: order.id
-        Pair: order.pair
-          Trade: order.trade
-            id: order.id, Amount:order.amount, Total: calculateTotal(), Price: c
-  */
-
   console.log("Setting independantClientOrderbook");
 
   //independant client orderbook operation of format: 'client1-tBTCUSD-Buy'
@@ -129,11 +130,10 @@ async function addToClientOrderBook (order) {
 
 }
 
-
-//function to retrive trading pair price given a paticular trading pair
+//function to retrive trading pair price, given a paticular trading pair from Bitfinex public API
 function retriveTradingPairPrice(tradingPair){
 
-  console.log("Retrievig trading pair price from Bitfinex for trading pair: ", tradingPair);
+  console.log("Retrieving trading pair price from Bitfinex for trading pair: ", tradingPair);
 
   const baseUrl = "https://api-pub.bitfinex.com/v2/";
   const pathParams = "tickers";
@@ -147,4 +147,24 @@ function retriveTradingPairPrice(tradingPair){
       }, error => {
           console.log(error);
       })
+}
+
+//If a client's order matches with another order, any remainer is added to the orderbook, too.
+function checkIfClientOrderExists(order,sharedOrderOperation){
+
+  console.log("Checking if an existing client order already exists");
+
+  // Assuming order already exists if: trade, pair and price are equal
+  console.log("sharedOrderbook[operation].length: ",Object.keys(sharedOrderbook[sharedOrderOperation]).length);
+
+  for(let i=0;i<sharedOrderbook[sharedOrderOperation].length;i++){
+    console.log("sharedOrderbook[operation][i]: ",sharedOrderbook[sharedOrderOperation][i]);
+    if(order.trade === sharedOrderbook[sharedOrderOperation][i].trade && order.pair === sharedOrderbook[sharedOrderOperation][i].pair && order.price === sharedOrderbook[sharedOrderOperation][i].price){
+      console.log("Found existing trade: ",sharedOrderbook[sharedOrderOperation][i]);
+      //assuming that if trade already exists, we increment the amount of that existing trade by the amount of the new matching trade
+      sharedOrderbook[sharedOrderOperation][i].amount = sharedOrderbook[sharedOrderOperation][i].amount + order.amount;
+      return true;
+    }
+      else false;
+  }
 }

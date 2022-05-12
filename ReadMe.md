@@ -91,3 +91,5 @@ You can change the payload of the respective clients to send different messages 
 const payload = {id:"client1",trade: "Buy", pair: "tBTCUSD", amount: 1.0860}
 
 ```
+
+Re-run the client with the new payload to send your new message to the RPC server

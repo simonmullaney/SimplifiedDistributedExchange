@@ -92,4 +92,10 @@ const payload = {id:"client1",trade: "Buy", pair: "tBTCUSD", amount: 1.0860}
 
 ```
 
-Re-run the client with the new payload to send your new message to the RPC server
+Re-run the client with the new payload to send your new message to the RPC server.
+
+
+### Limitations:
+
+* Not properly tested, no test suite to guarantee required functionality
+* Race conditions need some more thought and need tests written to ensure correct functionality
